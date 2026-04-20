@@ -59,16 +59,20 @@ class TinySlam:
         """
         # TODO for TP3
 
-    def compute(self):
-        """ Useless function, just for the exercise on using the profiler """
-        # Remove after TP1
+        # Conversion polaire local du laser/ cartésien absolu dans la carte
+        x_list = np.cos(lidar.get_ray_angles() + pose[2]) * lidar.get_sensor_values() + pose[0]
+        y_list = np.sin(lidar.get_ray_angles() + pose[2]) * lidar.get_sensor_values() + pose[1]
 
-        ranges = np.random.rand(3600)
-        ray_angles = np.arange(-np.pi, np.pi, np.pi / 1800)
+        # Update des points sur la ligne avec proba faible
+        for x, y in zip(x_list, y_list):
+            self.grid.add_value_along_line(pose[0], pose[1], x, y, val=-0.95)
 
-        # Poor implementation of polar to cartesian conversion
-        points = []
-        for i in range(3600):
-            pt_x = ranges[i] * np.cos(ray_angles[i])
-            pt_y = ranges[i] * np.sin(ray_angles[i])
-            points.append([pt_x, pt_y])
+        # Update des points cibles avec proba forte
+        self.grid.add_map_points(x_list, y_list, val=4)
+
+        # Seuil des probas
+        np.clip(self.grid.occupancy_map, -40, 40, out=self.grid.occupancy_map)
+
+
+
+

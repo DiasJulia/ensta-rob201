@@ -46,11 +46,15 @@ class MyRobotSlam(RobotAbstract):
         # storage for pose after localization
         self.corrected_pose = np.array([0, 0, 0])
 
+        self.goal = [-180, 0, 0]
+
+        self.grid = self.occupancy_grid
+
     def control(self):
         """
         Main control function executed at each time step
         """
-        return self.control_tp2()
+        return self.control_tp3()
 
     def control_tp1(self):
         """
@@ -68,9 +72,31 @@ class MyRobotSlam(RobotAbstract):
         Main control function with full SLAM, random exploration and path planning
         """
         pose = self.odometer_values()
-        goal = [0,0,0]
+        goal = [-180,0,0]
 
         # Compute new command speed to perform obstacle avoidance
         command = potential_field_control(self.lidar(), pose, goal)
+
+        return command
+    
+    def control_tp3(self):
+        """
+        Control function for TP3
+        Main control function with full SLAM, random exploration and path planning
+        """
+
+        pose = self.odometer_values()
+
+        # Update map with new observation
+        self.tiny_slam.update_map(self.lidar(), pose)
+
+        # Compute new command speed to perform obstacle avoidance
+    
+        command = potential_field_control(self.lidar(), pose, self.goal)
+
+        if command == {'forward': 0, 'rotation': 0}:
+            self.goal = np.random.uniform(low=[-500, -500, 0], high=[500, 140, 0])
+        
+        self.occupancy_grid.display_cv(robot_pose=pose, goal=self.goal)
 
         return command
