@@ -50,12 +50,15 @@ class MyRobotSlam(RobotAbstract):
 
         self.grid = self.occupancy_grid
 
+        self.last_distance_to_goal = None
+        self.last_progresses = np.zeros(30)
+
     def control(self):
         """
         Main control function executed at each time step
         """
         self.counter += 1
-        return self.control_tp2()
+        return self.control_tp2_extended()
 
     def control_tp1(self):
         """
@@ -98,6 +101,46 @@ class MyRobotSlam(RobotAbstract):
                                       0])
             else:
                 self.goal = self.goal + [-50, 0, 0]  # Move the goal to the left if no free space is found
+        
+        self.occupancy_grid.display_cv(robot_pose=pose, goal=self.goal)
+
+        return command
+    
+    def control_tp2_extended(self):
+        """
+        Control function for TP2
+        Main control function with full SLAM, random exploration and path planning
+        Implementing a local minima escape strategy by checking if the robot is stuck
+        """
+        pose = self.odometer_values()
+
+        # Compute new command speed to perform obstacle avoidance
+        command = potential_field_control(self.lidar(), pose, self.goal)
+
+        if command == {'forward': 0, 'rotation': 0}:
+            distances = self.lidar().get_sensor_values()
+            angles = self.lidar().get_ray_angles()
+            free_spaces = [(200.0, angle) for dist, angle in zip(distances, angles) if dist > 200.0]
+            if free_spaces:
+                chosen_space = free_spaces[np.random.choice(len(free_spaces))]
+                self.goal = np.array([chosen_space[0] * np.cos(chosen_space[1] + pose[2]) + pose[0],
+                                      chosen_space[0] * np.sin(chosen_space[1] + pose[2]) + pose[1],
+                                      0])
+            else:
+                self.goal = self.goal + [-50, 0, 0]
+        
+        self.occupancy_grid.display_cv(robot_pose=pose, goal=self.goal)
+
+        distance_to_goal = np.linalg.norm(self.goal[:2] - pose[:2])
+        
+        self.last_distance_to_goal = distance_to_goal
+        if self.last_distance_to_goal is not None:
+            self.last_progresses = np.roll(self.last_progresses, -1)
+            self.last_progresses[-1] = self.last_distance_to_goal - distance_to_goal
+
+        if self.last_progresses[-1] < 5 and np.all(self.last_progresses < 5) and self.counter % 30 == 0:
+            command = {"forward": -0.5, "rotation": 0}  # Move backward to escape local minima
+        
         self.occupancy_grid.display_cv(robot_pose=pose, goal=self.goal)
 
         return command
