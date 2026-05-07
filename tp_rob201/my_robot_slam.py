@@ -55,7 +55,7 @@ class MyRobotSlam(RobotAbstract):
         Main control function executed at each time step
         """
         self.counter += 1
-        return self.control_tp1_extended()
+        return self.control_tp2()
 
     def control_tp1(self):
         """
@@ -83,10 +83,22 @@ class MyRobotSlam(RobotAbstract):
         Main control function with full SLAM, random exploration and path planning
         """
         pose = self.odometer_values()
-        goal = [-180,0,0]
 
         # Compute new command speed to perform obstacle avoidance
-        command = potential_field_control(self.lidar(), pose, goal)
+        command = potential_field_control(self.lidar(), pose, self.goal)
+
+        if command == {'forward': 0, 'rotation': 0}:
+            distances = self.lidar().get_sensor_values()
+            angles = self.lidar().get_ray_angles()
+            free_spaces = [(200.0, angle) for dist, angle in zip(distances, angles) if dist > 200.0]
+            if free_spaces:
+                chosen_space = free_spaces[np.random.choice(len(free_spaces))]
+                self.goal = np.array([chosen_space[0] * np.cos(chosen_space[1] + pose[2]) + pose[0],
+                                      chosen_space[0] * np.sin(chosen_space[1] + pose[2]) + pose[1],
+                                      0])
+            else:
+                self.goal = self.goal + [-50, 0, 0]  # Move the goal to the left if no free space is found
+        self.occupancy_grid.display_cv(robot_pose=pose, goal=self.goal)
 
         return command
     
