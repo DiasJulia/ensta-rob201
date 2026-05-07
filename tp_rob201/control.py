@@ -17,7 +17,16 @@ def reactive_obst_avoid(lidar):
     # TODO for TP1
 
     laser_dist = lidar.get_sensor_values()
-    speed = 0.0
+    sensor_angles = lidar.get_ray_angles()
+
+    for i in range(len(laser_dist)):
+        if sensor_angles[i] > -np.pi/4 and sensor_angles[i] < np.pi/4 and laser_dist[i] < 50:
+            rotation_speed = random.uniform(-1.0, 1.0)
+            command = {"forward": 0.0,
+                       "rotation": rotation_speed}
+            return command
+
+    speed = 0.5
     rotation_speed = 0.0
 
     command = {"forward": speed,
