@@ -40,8 +40,6 @@ def potential_field_control(lidar, current_pose, goal_pose):
     current_pose = np.asarray(current_pose, dtype=float)
     goal_pose = np.asarray(goal_pose, dtype=float)
 
-    print(f"Current pose: {current_pose}\n Goal pose: {goal_pose}")
-
     # Attractice potential field
 
     K = 10.0  # attractive potential gain
@@ -58,8 +56,8 @@ def potential_field_control(lidar, current_pose, goal_pose):
         gradient = K * (goal_pose[:2] - current_pose[:2]) / distance_to_goal
 
      # Repulsive potential field
-    L = 50.0  # repulsive potential gain
-    d_min = 50  # minimum distance to obstacle
+    L = 100000.0  # repulsive potential gain
+    d_min = 20  # minimum distance to obstacle
 
     for i in range(len(lidar.get_sensor_values())):
         sensor_dist = lidar.get_sensor_values()[i]
@@ -79,8 +77,8 @@ def potential_field_control(lidar, current_pose, goal_pose):
     rotation_speed = angle_gain * heading_error
     
     # Clamp values to valid ranges [-1, 1]
-    forward_speed = np.clip(forward_speed, -1.0, 1.0)
-    rotation_speed = np.clip(rotation_speed, -1.0, 1.0)
+    forward_speed = np.clip(forward_speed, -0.5, 0.5)
+    rotation_speed = np.clip(rotation_speed, -0.5, 0.5)
     
     command = {"forward": forward_speed,
                "rotation": rotation_speed}

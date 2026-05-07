@@ -54,7 +54,8 @@ class MyRobotSlam(RobotAbstract):
         """
         Main control function executed at each time step
         """
-        return self.control_tp3()
+        self.counter += 1
+        return self.control_tp4()
 
     def control_tp1(self):
         """
@@ -95,6 +96,41 @@ class MyRobotSlam(RobotAbstract):
         command = potential_field_control(self.lidar(), pose, self.goal)
 
         if command == {'forward': 0, 'rotation': 0}:
+            self.goal = np.random.uniform(low=[-500, -500, 0], high=[500, 140, 0])
+        
+        self.occupancy_grid.display_cv(robot_pose=pose, goal=self.goal)
+
+        return command
+    
+    def control_tp4(self):
+        """
+        Control function for TP4
+        Main control function with full SLAM, random exploration and path planning
+        """
+
+        pose = self.odometer_values()
+
+        if self.counter > 10:
+            # Localise the robot and update the odometry reference
+            score = self.tiny_slam.localise(self.lidar(), pose)
+
+        # Update map with new observation
+        self.tiny_slam.update_map(self.lidar(), pose)
+
+        # Compute new command speed to perform obstacle avoidance
+    
+        command = potential_field_control(self.lidar(), pose, self.goal)
+
+        # potential_goals = self.lidar().get_sensor_values()
+        # potential_goals_angles = self.lidar().get_ray_angles()
+        # potential_goals = potential_goals[potential_goals < ]
+        # potential_goals_angles = potential_goals_angles[potential_goals < 10]
+
+        if command == {'forward': 0, 'rotation': 0}:
+            # goal_ref = np.random.choice(len(potential_goals))
+            # self.goal = np.array([potential_goals[goal_ref] * np.cos(potential_goals_angles[goal_ref]) + pose[0],
+            #                   potential_goals[goal_ref] * np.sin(potential_goals_angles[goal_ref]) + pose[1],
+            #                   0])
             self.goal = np.random.uniform(low=[-500, -500, 0], high=[500, 140, 0])
         
         self.occupancy_grid.display_cv(robot_pose=pose, goal=self.goal)
