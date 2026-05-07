@@ -80,15 +80,15 @@ def potential_field_control(lidar, current_pose, goal_pose):
     # TODO for TP2
     current_pose = np.asarray(current_pose, dtype=float)
     goal_pose = np.asarray(goal_pose, dtype=float)
-
-    # Attractice potential field
+    sensor_values = lidar.get_sensor_values()
+    ray_angles = lidar.get_ray_angles()
 
     K = 10.0  # attractive potential gain
 
     distance_to_goal = np.linalg.norm(goal_pose[:2] - current_pose[:2])
 
     # Tolerance to goal
-    T = 10
+    T = 25
     if distance_to_goal < T:
         command = {"forward": 0.0,
                    "rotation": 0.0}
@@ -98,30 +98,30 @@ def potential_field_control(lidar, current_pose, goal_pose):
 
      # Repulsive potential field
     L = 100000.0  # repulsive potential gain
-    d_min = 20  # minimum distance to obstacle
+    d_min = 25  # minimum distance to obstacle
 
-    for i in range(len(lidar.get_sensor_values())):
-        sensor_dist = lidar.get_sensor_values()[i]
+    for i in range(len(sensor_values)):
+        sensor_dist = sensor_values[i]
         if sensor_dist < d_min and sensor_dist > 0.01: 
-            angle = lidar.get_ray_angles()[i]
-            f_rep = L * (1/sensor_dist - 1/d_min) * np.array([np.cos(angle), np.sin(angle)])
+            angle_world = ray_angles[i] + current_pose[2]
+            rep_direction_world = np.array([np.cos(angle_world), np.sin(angle_world)]) * sensor_dist
+            f_rep = -(L * (1 / sensor_dist - 1 / d_min) / (sensor_dist ** 3)) * rep_direction_world 
             gradient += f_rep
     
     distance_gain = 0.02
-    angle_gain = 1.5
+    angle_gain = 10
 
     desired_heading = np.arctan2(gradient[1], gradient[0])
     heading_error = _wrap_to_pi(desired_heading - current_pose[2])
 
-    # Slow down linear motion when the goal direction is not in front of the robot.
     forward_speed = distance_gain * distance_to_goal * np.cos(heading_error)
     rotation_speed = angle_gain * heading_error
     
-    # Clamp values to valid ranges [-1, 1]
-    forward_speed = np.clip(forward_speed, -0.5, 0.5)
+    forward_speed = np.clip(forward_speed, -1, 0.5)
     rotation_speed = np.clip(rotation_speed, -0.5, 0.5)
     
     command = {"forward": forward_speed,
                "rotation": rotation_speed}
+    # print(f"Current pose: {current_pose}, Goal pose: {goal_pose}, Command: {command}, heading error: {heading_error}")
 
     return command
