@@ -17,10 +17,10 @@ def reactive_obst_avoid(lidar):
     # TODO for TP1
 
     laser_dist = lidar.get_sensor_values()
-    sensor_angles = lidar.get_ray_angles()
 
-    for i in range(len(laser_dist)):
-        if sensor_angles[i] > -np.pi/4 and sensor_angles[i] < np.pi/4 and laser_dist[i] < 50:
+    laser_dist_front = [laser_dist[i] for i in range(len(laser_dist)) if lidar.get_ray_angles()[i] > -np.pi/4 and lidar.get_ray_angles()[i] < np.pi/4]
+
+    if any(dist < 30.0 for dist in laser_dist_front):
             rotation_speed = random.uniform(-1.0, 1.0)
             command = {"forward": 0.0,
                        "rotation": rotation_speed}
@@ -30,6 +30,38 @@ def reactive_obst_avoid(lidar):
     rotation_speed = 0.0
 
     command = {"forward": speed,
+               "rotation": rotation_speed}
+
+    return command
+
+def wall_following_control(lidar):
+    """
+    Simple wall following control
+    lidar : placebot object with lidar data
+    """
+    # TODO for TP1
+
+    laser_dist = lidar.get_sensor_values()
+
+    laser_dist_front = [laser_dist[i] for i in range(len(laser_dist)) if lidar.get_ray_angles()[i] > -np.pi/4 and lidar.get_ray_angles()[i] < np.pi/4]
+    if any(dist < 30.0 for dist in laser_dist_front):
+        rotation_speed = 0.5
+        command = {"forward": 0.0,
+                   "rotation": rotation_speed}
+        return command
+
+    desired_distance = 100.0
+    Kp = 0.005
+
+    # Find the distance to the wall on the left side 
+    distance_to_wall = laser_dist[len(laser_dist) // 4]
+    error = - ( desired_distance - distance_to_wall)
+    
+    rotation_speed = (Kp * error)
+
+    rotation_speed = np.clip(rotation_speed, -0.5, 0.5)
+
+    command = {"forward": 0.5,
                "rotation": rotation_speed}
 
     return command

@@ -10,7 +10,7 @@ from place_bot.simulation.ray_sensors.lidar import LidarParams
 
 from tiny_slam import TinySlam
 
-from control import potential_field_control, reactive_obst_avoid
+from control import potential_field_control, reactive_obst_avoid, wall_following_control
 from occupancy_grid import OccupancyGrid
 from planner import Planner
 
@@ -55,7 +55,7 @@ class MyRobotSlam(RobotAbstract):
         Main control function executed at each time step
         """
         self.counter += 1
-        return self.control_tp4()
+        return self.control_tp1_extended()
 
     def control_tp1(self):
         """
@@ -65,6 +65,16 @@ class MyRobotSlam(RobotAbstract):
 
         # Compute new command speed to perform obstacle avoidance
         command = reactive_obst_avoid(self.lidar())
+        return command
+    
+    def control_tp1_extended(self):
+        """
+        Control function for TP1
+        Control funtion with Wall following behavior
+        """
+
+        # Compute new command speed to perform obstacle avoidance
+        command = wall_following_control(self.lidar())
         return command
 
     def control_tp2(self):
