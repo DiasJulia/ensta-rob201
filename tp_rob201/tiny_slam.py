@@ -69,14 +69,12 @@ class TinySlam:
         x_ref, y_ref, theta_ref = odom_pose_ref
         x_odom, y_odom, theta_odom = odom_pose
 
-        c = np.cos(theta_ref)
-        s = np.sin(theta_ref)
+        c = np.sqrt(x_odom ** 2 + y_odom ** 2)
+        s = np.atan2(y_odom, x_odom)
 
-        x_map = x_ref + c * x_odom - s * y_odom
-        y_map = y_ref + s * x_odom + c * y_odom
+        x_map = x_ref + c * np.cos(theta_ref + s)
+        y_map = y_ref + c * np.sin(theta_ref + s)
         theta_map = theta_ref + theta_odom
-
-        theta_map = np.arctan2(np.sin(theta_map), np.cos(theta_map))
 
         corrected_pose = np.array([x_map, y_map, theta_map])
 
@@ -97,10 +95,13 @@ class TinySlam:
 
         i = 0
 
-        while i < 100:
+        while i < 300:
+            offset = np.random.normal(0, 1, size=3)
+            offset[2] = np.random.normal(0, 0.1)
             # Générer une pose candidate en ajoutant un bruit gaussien à la pose actuelle
-            candidate_pose = pose + np.random.normal(0, 10, size=3)
+            candidate_pose = pose + offset
 
+            pose = self.get_corrected_pose(raw_odom_pose, odom_pose_ref=candidate_pose)
             # Calculer le score de la pose candidate
             score = self._score(lidar, candidate_pose)
 
@@ -108,8 +109,8 @@ class TinySlam:
             if score > best_score:
                 best_score = score
                 best_pose = candidate_pose
-
-            i += 1
+            else:
+                i += 1
         
         self.odom_pose_ref = best_pose
 

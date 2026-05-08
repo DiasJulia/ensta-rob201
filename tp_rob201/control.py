@@ -117,8 +117,8 @@ def potential_field_control(lidar, current_pose, goal_pose):
     forward_speed = distance_gain * distance_to_goal * np.cos(heading_error)
     rotation_speed = angle_gain * heading_error
     
-    forward_speed = np.clip(forward_speed, -0.5, 0.5)
-    rotation_speed = np.clip(rotation_speed, -0.5, 0.5)
+    forward_speed = np.clip(forward_speed, -0.3, 0.3)
+    rotation_speed = np.clip(rotation_speed, -0.1, 0.1)
     
     command = {"forward": forward_speed,
                "rotation": rotation_speed}

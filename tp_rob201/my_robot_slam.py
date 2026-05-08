@@ -51,7 +51,7 @@ class MyRobotSlam(RobotAbstract):
         self.grid = self.occupancy_grid
 
         self.last_distance_to_goal = np.linalg.norm(self.goal[:2] - self.corrected_pose[:2])
-        self.last_progresses = np.zeros(30)
+        self.last_progresses = np.zeros(20)
 
     def control(self):
         """
@@ -206,7 +206,7 @@ class MyRobotSlam(RobotAbstract):
         if command == {'forward': 0, 'rotation': 0}:
             distances = self.lidar().get_sensor_values()
             angles = self.lidar().get_ray_angles()
-            free_spaces = [(200.0, angle) for dist, angle in zip(distances, angles) if dist > 200.0]
+            free_spaces = [(180.0, angle) for dist, angle in zip(distances, angles) if dist > 200.0 and (angle > -np.pi/4 and angle < np.pi/4)]
             if free_spaces:
                 chosen_space = free_spaces[np.random.choice(len(free_spaces))]
                 self.goal = np.array([chosen_space[0] * np.cos(chosen_space[1] + pose[2]) + pose[0],
@@ -219,8 +219,8 @@ class MyRobotSlam(RobotAbstract):
         self.last_progresses[-1] = self.last_distance_to_goal - distance_to_goal
         self.last_distance_to_goal = distance_to_goal
 
-        if self.counter % 10 == 0:
-            if np.all(self.last_progresses < 0.5):
+        if self.counter % 20 == 0:
+            if np.all(np.abs(self.last_progresses) < 0.2):
                 distances = self.lidar().get_sensor_values()
                 angles = self.lidar().get_ray_angles()
                 free_spaces = [(180.0, angle) for dist, angle in zip(distances, angles) if dist > 200.0]
