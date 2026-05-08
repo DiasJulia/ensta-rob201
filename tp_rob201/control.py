@@ -88,7 +88,7 @@ def potential_field_control(lidar, current_pose, goal_pose):
     distance_to_goal = np.linalg.norm(goal_pose[:2] - current_pose[:2])
 
     # Tolerance to goal
-    T = 25
+    T = 30
     if distance_to_goal < T:
         command = {"forward": 0.0,
                    "rotation": 0.0}
@@ -98,7 +98,7 @@ def potential_field_control(lidar, current_pose, goal_pose):
 
      # Repulsive potential field
     L = 100000.0  # repulsive potential gain
-    d_min = 25  # minimum distance to obstacle
+    d_min = 20  # minimum distance to obstacle
 
     for i in range(len(sensor_values)):
         sensor_dist = sensor_values[i]
@@ -117,7 +117,7 @@ def potential_field_control(lidar, current_pose, goal_pose):
     forward_speed = distance_gain * distance_to_goal * np.cos(heading_error)
     rotation_speed = angle_gain * heading_error
     
-    forward_speed = np.clip(forward_speed, -1, 0.5)
+    forward_speed = np.clip(forward_speed, -0.5, 0.5)
     rotation_speed = np.clip(rotation_speed, -0.5, 0.5)
     
     command = {"forward": forward_speed,

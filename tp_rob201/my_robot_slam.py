@@ -50,7 +50,7 @@ class MyRobotSlam(RobotAbstract):
 
         self.grid = self.occupancy_grid
 
-        self.last_distance_to_goal = None
+        self.last_distance_to_goal = np.linalg.norm(self.goal[:2] - self.corrected_pose[:2])
         self.last_progresses = np.zeros(30)
 
     def control(self):
@@ -58,7 +58,7 @@ class MyRobotSlam(RobotAbstract):
         Main control function executed at each time step
         """
         self.counter += 1
-        return self.control_tp2_extended()
+        return self.control_tp3()
 
     def control_tp1(self):
         """
@@ -126,10 +126,6 @@ class MyRobotSlam(RobotAbstract):
                 self.goal = np.array([chosen_space[0] * np.cos(chosen_space[1] + pose[2]) + pose[0],
                                       chosen_space[0] * np.sin(chosen_space[1] + pose[2]) + pose[1],
                                       0])
-            else:
-                self.goal = self.goal + [-50, 0, 0]
-        
-        self.occupancy_grid.display_cv(robot_pose=pose, goal=self.goal)
 
         distance_to_goal = np.linalg.norm(self.goal[:2] - pose[:2])
         
@@ -138,8 +134,8 @@ class MyRobotSlam(RobotAbstract):
             self.last_progresses = np.roll(self.last_progresses, -1)
             self.last_progresses[-1] = self.last_distance_to_goal - distance_to_goal
 
-        if self.last_progresses[-1] < 5 and np.all(self.last_progresses < 5) and self.counter % 30 == 0:
-            command = {"forward": -0.5, "rotation": 0}  # Move backward to escape local minima
+        if np.all(self.last_progresses < 0.5) and self.counter % 10 == 0:
+            command = {"forward": -0.5, "rotation": -0.5}  # Move backward to escape local minima
         
         self.occupancy_grid.display_cv(robot_pose=pose, goal=self.goal)
 
@@ -153,17 +149,41 @@ class MyRobotSlam(RobotAbstract):
 
         pose = self.odometer_values()
 
-        # Update map with new observation
-        self.tiny_slam.update_map(self.lidar(), pose)
-
         # Compute new command speed to perform obstacle avoidance
     
         command = potential_field_control(self.lidar(), pose, self.goal)
 
         if command == {'forward': 0, 'rotation': 0}:
-            self.goal = np.random.uniform(low=[-500, -500, 0], high=[500, 140, 0])
+            distances = self.lidar().get_sensor_values()
+            angles = self.lidar().get_ray_angles()
+            free_spaces = [(200.0, angle) for dist, angle in zip(distances, angles) if dist > 200.0]
+            if free_spaces:
+                chosen_space = free_spaces[np.random.choice(len(free_spaces))]
+                self.goal = np.array([chosen_space[0] * np.cos(chosen_space[1] + pose[2]) + pose[0],
+                                      chosen_space[0] * np.sin(chosen_space[1] + pose[2]) + pose[1],
+                                      0])
         
-        self.occupancy_grid.display_cv(robot_pose=pose, goal=self.goal)
+        distance_to_goal = np.linalg.norm(self.goal[:2] - pose[:2])
+        
+        self.last_progresses = np.roll(self.last_progresses, -1)
+        self.last_progresses[-1] = self.last_distance_to_goal - distance_to_goal
+        self.last_distance_to_goal = distance_to_goal
+        
+        if self.counter % 10 == 0:
+            if np.all(self.last_progresses < 0.5):
+                distances = self.lidar().get_sensor_values()
+                angles = self.lidar().get_ray_angles()
+                free_spaces = [(180.0, angle) for dist, angle in zip(distances, angles) if dist > 200.0]
+                if free_spaces:
+                    chosen_space = free_spaces[np.random.choice(len(free_spaces))]
+                    self.goal = np.array([chosen_space[0] * np.cos(chosen_space[1] + pose[2]) + pose[0],
+                                        chosen_space[0] * np.sin(chosen_space[1] + pose[2]) + pose[1],
+                                        0])
+
+            # Update map with new observation
+            self.tiny_slam.update_map(self.lidar(), pose)
+        
+            self.occupancy_grid.display_cv(robot_pose=pose, goal=self.goal)
 
         return command
     

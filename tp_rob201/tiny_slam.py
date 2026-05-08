@@ -123,9 +123,16 @@ class TinySlam:
         """
         # TODO for TP3
 
+        distances = lidar.get_sensor_values()
+        angles = lidar.get_ray_angles()
+
+        mask = distances < lidar.max_range
+        distances = distances[mask]
+        angles = angles[mask]
+
         # Conversion polaire local du laser/ cartésien absolu dans la carte
-        x_list = np.cos(lidar.get_ray_angles() + pose[2]) * lidar.get_sensor_values() + pose[0]
-        y_list = np.sin(lidar.get_ray_angles() + pose[2]) * lidar.get_sensor_values() + pose[1]
+        x_list = np.cos(angles + pose[2]) * distances + pose[0]
+        y_list = np.sin(angles + pose[2]) * distances + pose[1]
 
         # Update des points sur la ligne avec proba faible
         for x, y in zip(x_list, y_list):
@@ -134,8 +141,11 @@ class TinySlam:
         # Update des points cibles avec proba forte
         self.grid.add_map_points(x_list, y_list, val=4)
 
+        self.grid.add_map_points(x_list + 0.5, y_list + 0.5, val=4)
+        self.grid.add_map_points(x_list - 0.5, y_list + 0.5, val=4)
+
         # Seuil des probas
-        np.clip(self.grid.occupancy_map, -40, 40, out=self.grid.occupancy_map)
+        np.clip(self.grid.occupancy_map, -20, 20, out=self.grid.occupancy_map)
 
 
 
