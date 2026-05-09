@@ -109,7 +109,7 @@ def potential_field_control(lidar, current_pose, goal_pose):
             gradient += f_rep
     
     distance_gain = 0.02
-    angle_gain = 10
+    angle_gain = 0.5
 
     desired_heading = np.arctan2(gradient[1], gradient[0])
     heading_error = _wrap_to_pi(desired_heading - current_pose[2])
@@ -117,7 +117,7 @@ def potential_field_control(lidar, current_pose, goal_pose):
     forward_speed = distance_gain * distance_to_goal * np.cos(heading_error)
     rotation_speed = angle_gain * heading_error
     
-    forward_speed = np.clip(forward_speed, -0.3, 0.3)
+    forward_speed = np.clip(forward_speed, -0.2, 0.2)
     rotation_speed = np.clip(rotation_speed, -0.1, 0.1)
     
     command = {"forward": forward_speed,

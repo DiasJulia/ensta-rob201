@@ -46,12 +46,14 @@ class MyRobotSlam(RobotAbstract):
         # storage for pose after localization
         self.corrected_pose = np.array([0, 0, 0])
 
-        self.goal = [-180, 0, 0]
+        self.goal = [-180, 10, 0]
 
         self.grid = self.occupancy_grid
 
         self.last_distance_to_goal = np.linalg.norm(self.goal[:2] - self.corrected_pose[:2])
-        self.last_progresses = np.zeros(20)
+        self.last_progresses = np.zeros(50)
+
+        self.path = None
 
     def control(self):
         """
@@ -249,19 +251,28 @@ class MyRobotSlam(RobotAbstract):
             # Localise the robot and update the odometry reference
             score = self.tiny_slam.localise(self.lidar(), pose)
 
+        if self.counter % 2000 == 0:
+            self.path = self.planner.plan(pose, [0, 0, 0])
+            if self.path is not None and self.path.shape[1] > 0:
+                self.goal = np.array([self.path[0, 0], self.path[1, 0], 0])
+
         # Compute new command speed to perform obstacle avoidance
     
         command = potential_field_control(self.lidar(), pose, self.goal)
 
         if command == {'forward': 0, 'rotation': 0}:
-            distances = self.lidar().get_sensor_values()
-            angles = self.lidar().get_ray_angles()
-            free_spaces = [(180.0, angle) for dist, angle in zip(distances, angles) if dist > 200.0 and (angle > -np.pi/4 and angle < np.pi/4)]
-            if free_spaces:
-                chosen_space = free_spaces[np.random.choice(len(free_spaces))]
-                self.goal = np.array([chosen_space[0] * np.cos(chosen_space[1] + pose[2]) + pose[0],
-                                      chosen_space[0] * np.sin(chosen_space[1] + pose[2]) + pose[1],
-                                      0])
+            if self.path is not None and self.path.shape[1] > 0:
+                self.goal = np.array([self.path[0, 0], self.path[1, 0], 0])
+                self.path = self.path[:, 1:]
+            else:
+                distances = self.lidar().get_sensor_values()
+                angles = self.lidar().get_ray_angles()
+                free_spaces = [(180.0, angle) for dist, angle in zip(distances, angles) if dist > 200.0 and (angle > -np.pi/4 and angle < np.pi/4)]
+                if free_spaces:
+                    chosen_space = free_spaces[np.random.choice(len(free_spaces))]
+                    self.goal = np.array([chosen_space[0] * np.cos(chosen_space[1] + pose[2]) + pose[0],
+                                        chosen_space[0] * np.sin(chosen_space[1] + pose[2]) + pose[1],
+                                        0])
         
         distance_to_goal = np.linalg.norm(self.goal[:2] - pose[:2])
         
@@ -283,7 +294,6 @@ class MyRobotSlam(RobotAbstract):
             # Update map with new observation
             self.tiny_slam.update_map(self.lidar(), pose)
 
-
-            self.occupancy_grid.display_cv(robot_pose=pose, goal=self.goal, traj=np.array(self.planner.plan(pose, self.goal).T, dtype=np.int32))
+            self.occupancy_grid.display_cv(robot_pose=pose, goal=self.goal, traj=self.path)
 
         return command
