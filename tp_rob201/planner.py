@@ -92,8 +92,9 @@ class Planner:
         g_score[start] = 0.0
 
         # best guess of cost for each cell (cost + heuristic)
+        mu = 3.0  # heuristic weight
         f_score = defaultdict(lambda: math.inf)
-        f_score[start] = 0.0 + self.heuristic(start, goal)
+        f_score[start] = 0.0 + self.heuristic(start, goal) * mu
 
         while len(open_set) > 0:
             current = heapq.heappop(open_set)
@@ -113,7 +114,7 @@ class Planner:
                     # better path, recording it
                     came_from[cell] = current_cell
                     g_score[cell] = tentative_g_score
-                    f_score[cell] = tentative_g_score + self.heuristic(cell, goal)
+                    f_score[cell] = tentative_g_score + self.heuristic(cell, goal) * mu
                     heapq.heappush(open_set, (f_score[cell], cell))
 
         # goal was never reached
