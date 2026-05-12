@@ -74,7 +74,7 @@ class Planner:
         self.map_walls = copy.deepcopy(self.grid.occupancy_map)
         # TODO for TP5: dilate walls in self.map_walls to take into account a margin around obstacles
 
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
         wall_mask = (self.map_walls > 0).astype(np.uint8)
         self.map_walls = cv2.dilate(wall_mask, kernel, iterations=1)
 
@@ -122,5 +122,53 @@ class Planner:
 
     def explore_frontiers(self):
         """ Frontier based exploration """
-        goal = np.array([0, 0, 0])  # frontier to reach for exploration
+
+        free_threshold = -0.5
+        unknown_min_threshold = -0.5
+        unknown_max_threshold = 0.5
+        
+        occupancy_map = self.grid.occupancy_map
+
+        unknown_mask = (occupancy_map > unknown_min_threshold) & (occupancy_map < unknown_max_threshold)
+        free_mask = (occupancy_map < free_threshold)
+
+        map_walls = copy.deepcopy(self.grid.occupancy_map)
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
+        wall_mask = (map_walls > 0).astype(np.uint8)
+        map_walls = cv2.dilate(wall_mask, kernel, iterations=1)
+
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+
+        # A frontier is a free cell that has at least one unknown neighbor
+        unknown_mask_dilated = cv2.dilate(unknown_mask.astype(np.uint8), kernel, iterations=1).astype(bool)
+        frontier_mask = free_mask & unknown_mask_dilated & ~map_walls.astype(bool)
+
+        #show frontiers 
+        frontier_display = np.zeros_like(occupancy_map)
+        frontier_display[frontier_mask] = 1
+        cv2.imshow("frontier", frontier_display)
+
+        num_labels, labels = cv2.connectedComponents(frontier_mask.astype(np.uint8))
+    
+        frontiers = []
+        for lbl in range(1, num_labels):
+            idx = np.where(labels == lbl)
+            if idx[0].size < 20:  # aumentado: filtra pequeno ruído
+                continue
+            x_map_indices = idx[0].astype(np.int32)
+            y_map_indices = idx[1].astype(np.int32)
+            centroid_x_map = int(np.mean(x_map_indices))
+            centroid_y_map = int(np.mean(y_map_indices))
+            wx, wy = self.grid.conv_map_to_world(np.array([centroid_x_map]), np.array([centroid_y_map]))
+            frontiers.append((float(wx[0]), float(wy[0])))
+
+        if len(frontiers) == 0:
+            return None
+        
+        # Escolhe o frontier mais próximo (ou maior, conforme preferir)
+        robot_pose = self.grid.conv_world_to_map(0, 0)  # pose local do robô no mapa
+        distances_to_frontier = [np.sqrt((f[0] - robot_pose[0])**2 + (f[1] - robot_pose[1])**2) for f in frontiers]
+        closest_frontier_idx = np.argmin(distances_to_frontier)
+        
+        goal = frontiers[closest_frontier_idx]
         return goal
