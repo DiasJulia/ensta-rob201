@@ -47,6 +47,7 @@ class MyRobotSlam(RobotAbstract):
         self.corrected_pose = np.array([0, 0, 0])
 
         self.goal = [-180, 10, 0]
+        self.temp_goal = self.goal
 
         self.final_goal = [0, 0, 0]
 
@@ -55,6 +56,8 @@ class MyRobotSlam(RobotAbstract):
         self.last_distance_to_goal = np.linalg.norm(self.goal[:2] - self.corrected_pose[:2])
         self.last_progresses = np.zeros(50)
 
+        self.escape_protocol_counter = 0
+
         self.path = None
 
     def control(self):
@@ -62,7 +65,7 @@ class MyRobotSlam(RobotAbstract):
         Main control function executed at each time step
         """
         self.counter += 1
-        return self.control_tp6()
+        return self.control_tp2_extended()
 
     def control_tp1(self):
         """
@@ -133,13 +136,28 @@ class MyRobotSlam(RobotAbstract):
 
         distance_to_goal = np.linalg.norm(self.goal[:2] - pose[:2])
         
-        self.last_distance_to_goal = distance_to_goal
-        if self.last_distance_to_goal is not None:
+        if self.escape_protocol_counter > 0:
+            if self.escape_protocol_counter == 1:
+                self.goal = self.temp_goal
+            self.escape_protocol_counter -= 1
+
+        elif np.all(self.last_progresses < 0.5) and self.counter % 100 == 0:
+            self.temp_goal = self.goal
+            distances = self.lidar().get_sensor_values()
+            angles = self.lidar().get_ray_angles()
+            free_spaces = [(200.0, angle) for dist, angle in zip(distances, angles) if dist > 200.0]
+            if free_spaces:
+                chosen_space = free_spaces[np.random.choice(len(free_spaces))]
+                self.goal = np.array([chosen_space[0] * np.cos(chosen_space[1] + pose[2]) + pose[0],
+                                      chosen_space[0] * np.sin(chosen_space[1] + pose[2]) + pose[1],
+                                      0])
+            self.escape_protocol_counter = 150  # Number of steps to execute the escape protocol
+        
+        elif self.last_distance_to_goal is not None:
             self.last_progresses = np.roll(self.last_progresses, -1)
             self.last_progresses[-1] = self.last_distance_to_goal - distance_to_goal
 
-        if np.all(self.last_progresses < 0.5) and self.counter % 10 == 0:
-            command = {"forward": -0.5, "rotation": -0.5}  # Move backward to escape local minima
+        self.last_distance_to_goal = distance_to_goal
         
         self.occupancy_grid.display_cv(robot_pose=pose, goal=self.goal)
 
@@ -173,7 +191,7 @@ class MyRobotSlam(RobotAbstract):
         self.last_progresses[-1] = self.last_distance_to_goal - distance_to_goal
         self.last_distance_to_goal = distance_to_goal
         
-        if self.counter % 10 == 0:
+        if self.counter % 50 == 0:
             if np.all(self.last_progresses < 0.5):
                 distances = self.lidar().get_sensor_values()
                 angles = self.lidar().get_ray_angles()
@@ -183,7 +201,7 @@ class MyRobotSlam(RobotAbstract):
                     self.goal = np.array([chosen_space[0] * np.cos(chosen_space[1] + pose[2]) + pose[0],
                                         chosen_space[0] * np.sin(chosen_space[1] + pose[2]) + pose[1],
                                         0])
-
+        if self.counter % 10 == 0:
             # Update map with new observation
             self.tiny_slam.update_map(self.lidar(), pose)
         
@@ -309,8 +327,7 @@ class MyRobotSlam(RobotAbstract):
         pose = self.odometer_values()
 
         if self.counter > 10:
-            # Localise the robot and update the odometry reference
-            score = self.tiny_slam.localise(self.lidar(), pose)
+            self.tiny_slam.localise(self.lidar(), pose)
     
         command = potential_field_control(self.lidar(), pose, self.goal)
 
