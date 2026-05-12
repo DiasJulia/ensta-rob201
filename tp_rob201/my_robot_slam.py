@@ -60,7 +60,7 @@ class MyRobotSlam(RobotAbstract):
         Main control function executed at each time step
         """
         self.counter += 1
-        return self.control_tp5()
+        return self.control_tp6()
 
     def control_tp1(self):
         """
@@ -251,7 +251,7 @@ class MyRobotSlam(RobotAbstract):
             # Localise the robot and update the odometry reference
             score = self.tiny_slam.localise(self.lidar(), pose)
 
-        if self.counter % 2000 == 0:
+        if self.counter % 5000 == 0:
             self.path = self.planner.plan(pose, [0, 0, 0])
             if self.path is not None and self.path.shape[1] > 0:
                 self.goal = np.array([self.path[0, 0], self.path[1, 0], 0])
@@ -273,6 +273,58 @@ class MyRobotSlam(RobotAbstract):
                     self.goal = np.array([chosen_space[0] * np.cos(chosen_space[1] + pose[2]) + pose[0],
                                         chosen_space[0] * np.sin(chosen_space[1] + pose[2]) + pose[1],
                                         0])
+        
+        distance_to_goal = np.linalg.norm(self.goal[:2] - pose[:2])
+        
+        self.last_progresses = np.roll(self.last_progresses, -1)
+        self.last_progresses[-1] = self.last_distance_to_goal - distance_to_goal
+        self.last_distance_to_goal = distance_to_goal
+
+        if self.counter % 20 == 0:
+            if np.all(np.abs(self.last_progresses) < 0.2):
+                distances = self.lidar().get_sensor_values()
+                angles = self.lidar().get_ray_angles()
+                free_spaces = [(180.0, angle) for dist, angle in zip(distances, angles) if dist > 200.0]
+                if free_spaces:
+                    chosen_space = free_spaces[np.random.choice(len(free_spaces))]
+                    self.goal = np.array([chosen_space[0] * np.cos(chosen_space[1] + pose[2]) + pose[0],
+                                        chosen_space[0] * np.sin(chosen_space[1] + pose[2]) + pose[1],
+                                        0])
+
+            # Update map with new observation
+            self.tiny_slam.update_map(self.lidar(), pose)
+
+            self.occupancy_grid.display_cv(robot_pose=pose, goal=self.goal, traj=self.path)
+
+        return command
+    
+    def control_tp6(self):
+        """
+        Control function for TP6
+        Main control function with full SLAM, frontier-based exploration and path planning
+        """
+
+        pose = self.odometer_values()
+
+        if self.counter > 10:
+            # Localise the robot and update the odometry reference
+            score = self.tiny_slam.localise(self.lidar(), pose)
+
+        if self.counter % 5000 == 0:
+            self.path = self.planner.plan(pose, [0, 0, 0])
+            if self.path is not None and self.path.shape[1] > 0:
+                self.goal = np.array([self.path[0, 0], self.path[1, 0], 0])
+            else:
+                # Frontier-based exploration: set the goal to a random frontier if no path to the target is found
+
+        # Compute new command speed to perform obstacle avoidance
+    
+        command = potential_field_control(self.lidar(), pose, self.goal)
+
+        if command == {'forward': 0, 'rotation': 0}:
+            if self.path is not None and self.path.shape[1] > 0:
+                self.goal = np.array([self.path[0, 0], self.path[1, 0], 0])
+                self.path = self.path[:, 1:]
         
         distance_to_goal = np.linalg.norm(self.goal[:2] - pose[:2])
         
