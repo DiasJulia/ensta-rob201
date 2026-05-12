@@ -131,6 +131,9 @@ class TinySlam:
         distances = distances[mask]
         angles = angles[mask]
 
+        # distances = distances[::2]  # Take every second point to speed up
+        # angles = angles[::2]        # Take every second point to speed up
+
         # Conversion polaire local du laser/ cartésien absolu dans la carte
         x_list = np.cos(angles + pose[2]) * distances + pose[0]
         y_list = np.sin(angles + pose[2]) * distances + pose[1]
@@ -143,7 +146,7 @@ class TinySlam:
         self.grid.add_map_points(x_list, y_list, val=4)
 
         self.grid.add_map_points(x_list + 0.5, y_list + 0.5, val=4)
-        self.grid.add_map_points(x_list - 0.5, y_list + 0.5, val=4)
+        self.grid.add_map_points(x_list - 0.5, y_list - 0.5, val=4)
 
         # Seuil des probas
         np.clip(self.grid.occupancy_map, -20, 20, out=self.grid.occupancy_map)
