@@ -78,7 +78,7 @@ class Planner:
         wall_mask = (self.map_walls > 0).astype(np.uint8)
         self.map_walls = cv2.dilate(wall_mask, kernel, iterations=1)
 
-        cv2.imshow("map_walls", self.map_walls * 255)
+        # cv2.imshow("map_walls", self.map_walls * 255)
 
         # min heap to contain values to explore next
         open_set = [(0.0, start)]
@@ -92,7 +92,7 @@ class Planner:
         g_score[start] = 0.0
 
         # best guess of cost for each cell (cost + heuristic)
-        mu = 3.0  # heuristic weight
+        mu = 0.0  # heuristic weight
         f_score = defaultdict(lambda: math.inf)
         f_score[start] = 0.0 + self.heuristic(start, goal) * mu
 
@@ -145,9 +145,9 @@ class Planner:
         frontier_mask = free_mask & unknown_mask_dilated & ~map_walls.astype(bool)
 
         #show frontiers 
-        frontier_display = np.zeros_like(occupancy_map)
-        frontier_display[frontier_mask] = 1
-        cv2.imshow("frontier", frontier_display)
+        #frontier_display = np.zeros_like(occupancy_map)
+        #frontier_display[frontier_mask] = 1
+        #cv2.imshow("frontier", frontier_display)
 
         num_labels, labels = cv2.connectedComponents(frontier_mask.astype(np.uint8))
     
